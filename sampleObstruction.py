@@ -137,4 +137,4 @@ if salome.sg.hasDesktop():
 
 import salomeToOpenFOAM
 import profile
-profile.run("salomeToOpenFOAM.exportToFoam(Mesh_1,'./sampleBox/polyMesh')")
+profile.run("salomeToOpenFOAM.exportToFoam(Mesh_1,'./sampleObstruction/polyMesh')")
