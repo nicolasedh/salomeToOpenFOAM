@@ -1,13 +1,21 @@
 u"""
 Export a Salome Mesh to OpenFOAM.
 
-It handles all types of cells but not yet regions. Use
+It handles all types of cells. Use 
 salomeToOpenFOAM.exportToFoam(Mesh_1) 
 to export. Optionally an output dir can be given as argument.
 
 It's also possible to select a mesh in the object browser and
-run the script via file->load script (ctrl-T)
+run the script via file->load script (ctrl-T).
 
+Groups of volumes will be treated as cellZones. If they are 
+present they will be put in the file cellZones. In order to convert
+to regions use the OpenFOAM tool 
+splitMeshRegions - cellZones
+
+No sorting of faces is done so you'll have to run
+renumberMesh -overwrite
+In order to use the mesh.
 """
 #Copyright 2013
 #Author Nicolas Edh,
@@ -98,7 +106,10 @@ def exportToFoam(mesh,dirname='polyMesh'):
     volumes=mesh.GetElementsByType(SMESH.VOLUME)
     __debugPrint__("Number of cells: %d\n" %len(volumes))
     __debugPrint__('Counting number of faces:\n')
-    nrBCfaces=mesh.NbFaces();#number of bcfaces in Salome
+    #Filter faces
+    filter=smesh.GetFilter(SMESH.EDGE,SMESH.FT_FreeFaces)
+    nrBCfaces=len(mesh.GetIdsFromFilter(filter))
+    #nrBCfaces=mesh.NbFaces();#number of bcfaces in Salome
 
     nrFaces=0;
     for v in volumes:
@@ -321,7 +332,41 @@ def exportToFoam(mesh,dirname='polyMesh'):
         fileBoundary.write("\t}\n")
     fileBoundary.write(")\n")
     fileBoundary.close()
-    
+
+    #WRITE cellZones
+#Count number of cellZones
+    nrCellZones=0;
+    cellZonesName=list();
+    for grp in mesh.GetGroups():
+        if grp.GetType() == SMESH.VOLUME:
+            nrCellZones+=1
+            cellZonesName.append(grp.GetName())
+    if nrCellZones > 0:
+        try:
+            fileCellZones=open(dirname + "/cellZones",'w')
+        except Exception:
+            print "Could not open the file cellZones, other files are ok."
+        __debugPrint__("Writing file cellZones\n")
+        __writeHeader__(fileCellZones,"cellZones")
+        fileCellZones.write("\n%d(\n" %nrCellZones)
+        firstSalomeVolID=volumes[0]
+        for grp in mesh.GetGroups():
+            if grp.GetType() == SMESH.VOLUME:
+                fileCellZones.write(grp.GetName()+"\n{\n")
+                fileCellZones.write("\ttype\tcellZone;\n")
+                fileCellZones.write("\tcellLabels\tList<label>\n")
+                cellSalomeIDs=grp.GetIDs()
+                nrGrpCells=len(cellSalomeIDs)
+                fileCellZones.write("%d\n(\n" %nrGrpCells)
+                for csId in cellSalomeIDs:
+                    ofID=csId-firstSalomeVolID
+                    fileCellZones.write("%d\n" %ofID)
+
+                fileCellZones.write(");\n}\n")
+        fileCellZones.write(")\n")
+        fileCellZones.flush()
+        fileCellZones.close()
+
     __debugPrint__("Finished writing to %s/%s \n" %(os.getcwd(),dirname))
     __debugPrint__("Remenber to run renumberMesh -overwrite\n")
 
@@ -349,12 +394,14 @@ def __writeHeader__(file,fileType,nrPoints=0,nrCells=0,nrFaces=0,nrIntFaces=0):
                        %(nrPoints,nrCells,nrFaces,nrIntFaces))
     elif(fileType == "boundary"):
         file.write("polyBoundaryMesh;\n")
-    
+    elif(fileType=="cellZones"):
+        file.write("regIOobject;\n")
     file.write("\tlocation\t\"constant/polyMesh\";\n")
     file.write("\tobject\t\t" + fileType +";\n")
     file.write("}\n\n")
 
 
+    
 def __debugPrint__(msg,level=1):
     """Print only if level >= debug """
     if(debug >= level ):
@@ -456,7 +503,8 @@ if __name__ == "__main__":
                 %(os.getcwd(),mName)
             foundMesh=True
             outdir=os.getcwd()+"/"+mName+"/constant/polyMesh"
-            exportToFoam(selobj.GetMesh(),outdir)
+            mesh=smesh.Mesh(selobj)
+            exportToFoam(mesh,outdir)
 
     if not foundMesh:
         print "You have to select a mesh object and then run this script."
