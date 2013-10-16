@@ -11,9 +11,8 @@ Create groups of volumes, these will be exported to a file
 called cellZones, in order to split use 
 splitMeshRegions -cellZones
 
-At the moment no reordering of the mesh is done so
-you'll have to run renumberMesh -overwrite after 
-exporting the mesh.
+The face are reoreded to "upper triangular order" but
+you might still benifit from a renumberMesh.
 
 License
 
