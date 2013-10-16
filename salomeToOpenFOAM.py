@@ -240,7 +240,7 @@ def exportToFoam(mesh,dirname='polyMesh'):
                     facesSorted[key]=offid
                     owner[offid]=ofvid
                     offid=offid+1
-                    if(offid % (nrFaces/50)==0):
+                    if(nrFaces > 50 and offid % (nrFaces/50)==0):
                         if(offid % ((nrFaces/50)*10) == 0):
                             __debugPrint__(':',1)
                         else:
@@ -261,7 +261,34 @@ def exportToFoam(mesh,dirname='polyMesh'):
     __debugPrint__(str(neighbour)+"\n",3)
 
 
-    
+    #Convert to "upper triangular order"
+    #owner is sorted, for each cell sort faces it's neighbour faces
+    # i.e. change 
+    # owner   neighbour          owner   neighbour
+    #     0          15                    0                3
+    #     0            3          to       0              15
+    #     0           17                   0              17
+    #     1            5                    1                5
+    # any changes made to neighbour are repeated to faces.
+    __debugPrint__("Sorting faces in upper triangular order\n",1)
+    ownedfaces=1
+    for faceId in xrange(0,nrIntFaces):
+        cellId=owner[faceId]
+        nextCellId=owner[faceId+1] #np since len(owner) > nrIntFaces
+        if cellId == nextCellId:
+            ownedfaces+=1
+            continue
+        
+        if ownedfaces >1:
+            sId=faceId-ownedfaces+1 #start ID
+            eId=faceId #end ID
+            inds=range(sId,eId+1)
+            inds.sort(key=neighbour.__getitem__)
+            neighbour[sId:eId+1]=map(neighbour.__getitem__,inds)
+            faces[sId:eId+1]=map(faces.__getitem__,inds)
+
+        ownedfaces=1
+            
     #WRITE points to file
     __debugPrint__("Writing the file points\n")
     __writeHeader__(filePoints,"points")
@@ -368,7 +395,7 @@ def exportToFoam(mesh,dirname='polyMesh'):
         fileCellZones.close()
 
     __debugPrint__("Finished writing to %s/%s \n" %(os.getcwd(),dirname))
-    __debugPrint__("Remenber to run renumberMesh -overwrite\n")
+
 
 def __writeHeader__(file,fileType,nrPoints=0,nrCells=0,nrFaces=0,nrIntFaces=0):
     """Write a header for the files points, faces, owner, neighbour"""
