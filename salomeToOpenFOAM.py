@@ -46,7 +46,6 @@ import SMESH
 from salome.smesh import smeshBuilder
 import os
 
-
 #different levels of verbosities, 0 all quiet,
 #higher values means more information
 debug=1
@@ -177,7 +176,11 @@ def exportToFoam(mesh,dirname='polyMesh'):
                 ofbcfid+=1
         if not 'defaultPatches' in grpNames:
             grpNames.append('defaultPatches')
-            defGroup=mesh.CreateGroup( SMESH.FACE, 'defaultPatches' )
+            #function might have different name
+            try:
+                defGroup=mesh.CreateGroup(SMESH.FACE, 'defaultPatches' )
+            except AttributeError:
+                defGroup=mesh.CreateEmptyGroup(SMESH.FACE, 'defaultPatches' )
         else:
             ind=grpNames.index('defaulPatches')
             defGroup=mesh.GetGroups()[ind]
@@ -512,6 +515,7 @@ def __crossprod__(u,v):
 
 
 if __name__ == "__main__":
+    smesh = smeshBuilder.New(salome.myStudy)
     """ 
     Main function. Export the selected mesh.
     
