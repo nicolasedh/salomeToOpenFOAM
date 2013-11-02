@@ -589,13 +589,13 @@ if __name__ == "__main__":
     Will try to find the selected mesh.
     """
     meshes=findSelectedMeshes()
-    if not mesh == None:
-        for mesh in meshes:
+    for mesh in meshes:
+        if not mesh == None:
             mName=mesh.GetName()
             print "found selected mesh exporting to %s/%s/constant/polyMesh" \
                 %(os.getcwd(),mName)
             outdir=os.getcwd()+"/"+mName+"/constant/polyMesh"
-            exportToFoam(mesh,mesh.GetName)
+            exportToFoam(mesh,mesh.GetName())
             print " "
             
     
