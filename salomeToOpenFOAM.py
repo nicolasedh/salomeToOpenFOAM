@@ -575,7 +575,7 @@ def findSelectedMeshes():
     else:
         return meshes
 
-    def __isGroupBaffle__(mesh,group,extFaces):
+def __isGroupBaffle__(mesh,group,extFaces):
     for sid in group.GetIDs():
         if not sid in extFaces:
             return True
