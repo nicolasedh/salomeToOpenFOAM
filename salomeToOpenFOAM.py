@@ -107,18 +107,20 @@ def exportToFoam(mesh,dirname='polyMesh'):
     __debugPrint__('Counting number of faces:\n')
     #Filter faces
     filter=smesh.GetFilter(SMESH.EDGE,SMESH.FT_FreeFaces)
-    nrBCfaces=len(mesh.GetIdsFromFilter(filter))
+    extFaces=mesh.GetIdsFromFilter(filter)
+    nrBCfaces=len(extFaces)
+    nrExtFaces=len(extFaces)
     #nrBCfaces=mesh.NbFaces();#number of bcfaces in Salome
 
     nrFaces=0;
     for v in volumes:
         nrFaces+=mesh.ElemNbFaces(v)
-    #all internal faces will be counted twice, bc-faces once
+    #all internal faces will be counted twice, external faces once
     #so:
-    nrFaces=(nrFaces+nrBCfaces)/2
+    nrFaces=(nrFaces+nrExtFaces)/2
     nrIntFaces=nrFaces-nrBCfaces #
     __debugPrint__('total number of faces: %d, internal: %d, external %d\n'  \
-        %(nrFaces,nrIntFaces,nrBCfaces))
+        %(nrFaces,nrIntFaces,nrExtFaces))
 
     __debugPrint__("Converting mesh to OpenFOAM\n")
     faces=[] #list of internal face nodes ((1 2 3 4 ... ))
@@ -134,6 +136,7 @@ def exportToFoam(mesh,dirname='polyMesh'):
     grpNrFaces=[] # list of number faces in each BC
     grpNames=[] #list of the group name.
     ofbcfid=0;  # bc face id in openfoam
+    nrExtFacesInGroups=0
     for gr in mesh.GetGroups():
         if gr.GetType() == SMESH.FACE:
             grpNames.append(gr.GetName())
@@ -156,14 +159,35 @@ def exportToFoam(mesh,dirname='polyMesh'):
                                         "or more groups. One is : %s" \
                                         %(sfid,fnodes,gr.GetName()))
 
+            #if the group is a baffle then the faces should be added twice
+            if __isGroupBaffle__(mesh,gr,extFaces):
+                __debugPrint__("group %s is a baffle" %gr.GetName(),1)
+                nrBCfaces+=nr
+                nrFaces+=nr
+                nrIntFaces-=nr
+                #since nrIntFaces is reduced all previously grpStartFaces are 
+                #out of sync
+                grpStartFace=[x-nr for x in grpStartFace]
+                grpNrFaces[-1]=nr*2
+                for sfid in gr.GetIDs():
+                    fnodes=mesh.GetElemNodes(sfid)
+                    key="%s" %sorted(fnodes,reverse=True)
+                    bcFaces.append(fnodes)
+                    bcFacesSorted[key]=ofbcfid
+                    ofbcfid=ofbcfid+1
+            else:
+                nrExtFacesInGroups+=nr
+
+    __debugPrint__('total number of faces: %d, internal: %d, external %d\n'  \
+        %(nrFaces,nrIntFaces,nrExtFaces),2)
     #Do the defined groups cover all BC-faces?
-    if len(bcFaces)< nrBCfaces:
+    if nrExtFacesInGroups < nrExtFaces:
         __debugPrint__("Warning, some elements don't have a group (BC). " +\
                        "Adding to a new group called defaultPatches\n",1)
         grpStartFace.append(nrIntFaces+ofbcfid)
-        grpNrFaces.append(nrBCfaces-len(bcFaces))
+        grpNrFaces.append(nrExtFaces-nrExtFacesInGroups)
         salomeIDs=[]
-        for face in mesh.GetElementsByType(SMESH.FACE):
+        for face in extFaces:
             fnodes=mesh.GetElemNodes(face)
             key="%s" %sorted(fnodes)
             try:
@@ -174,16 +198,17 @@ def exportToFoam(mesh,dirname='polyMesh'):
                 bcFacesSorted[key]=ofbcfid
                 salomeIDs.append(face)
                 ofbcfid+=1
-        if not 'defaultPatches' in grpNames:
-            grpNames.append('defaultPatches')
-            #function might have different name
-            try:
-                defGroup=mesh.CreateGroup(SMESH.FACE, 'defaultPatches' )
-            except AttributeError:
-                defGroup=mesh.CreateEmptyGroup(SMESH.FACE, 'defaultPatches' )
-        else:
-            ind=grpNames.index('defaulPatches')
-            defGroup=mesh.GetGroups()[ind]
+        newGrpName="defaultPatches"
+        nri=1
+        while newGrpName in grpNames:
+            newGrpName="defaultPatches_%d" %nri
+            nri+=1
+        grpNames.append(newGrpName)
+        #function might have different name
+        try:
+            defGroup=mesh.CreateGroup(SMESH.FACE, 'defaultPatches' )
+        except AttributeError:
+            defGroup=mesh.CreateEmptyGroup(SMESH.FACE, 'defaultPatches' )
 
         defGroup.Add(salomeIDs)
         smesh.SetName(defGroup, 'defaultPatches')
@@ -192,7 +217,7 @@ def exportToFoam(mesh,dirname='polyMesh'):
 
     #initialise the list faces vs owner/neighbour cells
     owner=[-1]*nrFaces
-    neighbour=[-1]*(nrIntFaces)
+    neighbour=[-1]*nrIntFaces
     __debugPrint__("Finished processing boundary faces\n")
     __debugPrint__('bcFaces: %d\n' %(len(bcFaces)),2)
     __debugPrint__(str(bcFaces)+"\n",3)
@@ -221,19 +246,30 @@ def exportToFoam(mesh,dirname='polyMesh'):
                 # to the neighbour list
                 #print "fidinof %d" %fidinof
                 neighbour[fidinof]=ofvid
-                __debugPrint__('\tan owner already exist for %d, %s, cell %d\n' %(fi,fnodes,v),3)
+                __debugPrint__('\tan owner already exist for %d, %s, cell %d\n' %(fi,fnodes,ofvid),3)
             except KeyError:
                 #the face is not in the list of internal faces
-                #it might a new or a BCface.
+                #it might a new face or a BCface.
                 try:
                     key="%s" %sorted(fnodes)
                     bcind=bcFacesSorted[key]
                     #if no exception was trown then it's a bc face
-                    owner[nrIntFaces+bcind]=ofvid
-                    __debugPrint__('\t found bc face: %d, %s, cell %d\n' %(bcind,fnodes,v),3)
+                    __debugPrint__('\t found bc face: %d, %s, cell %d\n' %(bcind,fnodes,ofvid),3)
+                    #if the face belongs to a baffle then it exits twice in owner
+                    #check dont overwrite owner
+                    if owner[nrIntFaces+bcind]==-1:
+                        owner[nrIntFaces+bcind]=ofvid
+                        bcFaces[bcind]=fnodes
+                    else:
+                        #build functions that looks for baffles in bclist. with bcind
+                        key="%s" %sorted(fnodes,reverse=True)
+                        bcind=bcFacesSorted[key]
+                        #make sure the faces has the correct orientation
+                        bcFaces[bcind]=fnodes
+                        owner[nrIntFaces+bcind]=ofvid
                 except KeyError:
                     #the face is not in bc list either so it's a new internal face
-                    __debugPrint__('\t a new face was found, %d, %s, cell %d\n' %(fi,fnodes,v),3)
+                    __debugPrint__('\t a new face was found, %d, %s, cell %d\n' %(fi,fnodes,ofvid),3)
                     if verify:
                         if not __verifyFaceOrder__(mesh,nodes,fnodes):
                             __debugPrint__("\t face has bad order, reversing order\n",3)
@@ -377,9 +413,11 @@ def exportToFoam(mesh,dirname='polyMesh'):
         except Exception:
             print "Could not open the file cellZones, other files are ok."
         __debugPrint__("Writing file cellZones\n")
+        #create a dictionary where salomeIDs are keys
+        #and OF cell ids are values.
+        scToOFc=dict([sa,of] for of,sa in enumerate(volumes))
         __writeHeader__(fileCellZones,"cellZones")
         fileCellZones.write("\n%d(\n" %nrCellZones)
-        firstSalomeVolID=volumes[0]
         for grp in mesh.GetGroups():
             if grp.GetType() == SMESH.VOLUME:
                 fileCellZones.write(grp.GetName()+"\n{\n")
@@ -389,7 +427,7 @@ def exportToFoam(mesh,dirname='polyMesh'):
                 nrGrpCells=len(cellSalomeIDs)
                 fileCellZones.write("%d\n(\n" %nrGrpCells)
                 for csId in cellSalomeIDs:
-                    ofID=csId-firstSalomeVolID
+                    ofID=scToOFc[csId]
                     fileCellZones.write("%d\n" %ofID)
 
                 fileCellZones.write(");\n}\n")
@@ -512,15 +550,9 @@ def __crossprod__(u,v):
     res[2]=u[0]*v[1]-u[1]*v[0]
     return res
 
-
-
-if __name__ == "__main__":
+def findSelectedMeshes():
+    meshes=list()
     smesh = smeshBuilder.New(salome.myStudy)
-    """ 
-    Main function. Export the selected mesh.
-    
-    Will try to find the selected mesh.
-    """
     nrSelected=salome.sg.SelectedCount() # total number of selected items
     
     foundMesh=False
@@ -530,16 +562,40 @@ if __name__ == "__main__":
         selobj=selobjID.GetObject()
         if selobj.__class__ ==SMESH._objref_SMESH_Mesh:
             mName=selobjID.GetName().replace(" ","_")
-            print "found selected mesh exporting to %s/%s/constant/polyMesh" \
-                %(os.getcwd(),mName)
             foundMesh=True
-            outdir=os.getcwd()+"/"+mName+"/constant/polyMesh"
             mesh=smesh.Mesh(selobj)
-            exportToFoam(mesh,outdir)
+            meshes.append(mesh)
 
     if not foundMesh:
         print "You have to select a mesh object and then run this script."
         print "or run the export function directly from TUI"
-        print " import SalomeToFoamExporter"
-        print " SalomeToFoamExporter.exportToFoam(mesh,path)" 
+        print " import SalomeToOpenFOAM"
+        print " SalomeToOpenFOAM.exportToFoam(mesh,path)" 
+        return None
+    else:
+        return meshes
 
+    def __isGroupBaffle__(mesh,group,extFaces):
+    for sid in group.GetIDs():
+        if not sid in extFaces:
+            return True
+    return False
+        
+
+if __name__ == "__main__":
+    """ 
+    Main function. Export the selected mesh.
+    
+    Will try to find the selected mesh.
+    """
+    meshes=findSelectedMeshes()
+    if not mesh == None:
+        for mesh in meshes:
+            mName=mesh.GetName()
+            print "found selected mesh exporting to %s/%s/constant/polyMesh" \
+                %(os.getcwd(),mName)
+            outdir=os.getcwd()+"/"+mName+"/constant/polyMesh"
+            exportToFoam(mesh,mesh.GetName)
+            print " "
+            
+    
