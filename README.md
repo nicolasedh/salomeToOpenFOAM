@@ -11,8 +11,10 @@ Create groups of volumes, these will be exported to a file
 called cellZones, in order to split use 
 splitMeshRegions -cellZones
 
-The face are reoreded to "upper triangular order" but
+The faces are reoreded to "upper triangular order" but
 you might still benifit from a renumberMesh.
+
+Support for internal patches (baffles) has been added.
 
 License
 
