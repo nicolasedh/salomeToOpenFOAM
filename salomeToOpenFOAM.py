@@ -44,7 +44,7 @@ import sys
 import salome
 import SMESH
 from salome.smesh import smeshBuilder
-import os
+import os,time
 
 #different levels of verbosities, 0 all quiet,
 #higher values means more information
@@ -82,7 +82,7 @@ def exportToFoam(mesh,dirname='polyMesh'):
 
     facesSorted[key]=value
     """
-
+    starttime=time.time()
     #try to open files
     if not os.path.exists(dirname):
         os.makedirs(dirname)
@@ -327,7 +327,8 @@ def exportToFoam(mesh,dirname='polyMesh'):
             faces[sId:eId+1]=map(faces.__getitem__,inds)
 
         ownedfaces=1
-            
+    converttime=time.time()-starttime
+
     #WRITE points to file
     __debugPrint__("Writing the file points\n")
     __writeHeader__(filePoints,"points")
@@ -435,8 +436,12 @@ def exportToFoam(mesh,dirname='polyMesh'):
         fileCellZones.flush()
         fileCellZones.close()
 
+    totaltime=time.time()-starttime
     __debugPrint__("Finished writing to %s/%s \n" %(os.getcwd(),dirname))
-
+    __debugPrint__("Converted mesh in %.0fs\n" %(converttime),1)
+    __debugPrint__("Wrote mesh in %.0fs\n" %(totaltime-converttime),1)
+    __debugPrint__("Total time: %0.fs\n" %totaltime,1)
+                   
 
 def __writeHeader__(file,fileType,nrPoints=0,nrCells=0,nrFaces=0,nrIntFaces=0):
     """Write a header for the files points, faces, owner, neighbour"""
