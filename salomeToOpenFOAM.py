@@ -161,7 +161,6 @@ def exportToFoam(mesh,dirname='polyMesh'):
 
             #if the group is a baffle then the faces should be added twice
             if __isGroupBaffle__(mesh,gr,extFaces):
-                __debugPrint__("group %s is a baffle" %gr.GetName(),1)
                 nrBCfaces+=nr
                 nrFaces+=nr
                 nrIntFaces-=nr
@@ -583,6 +582,7 @@ def findSelectedMeshes():
 def __isGroupBaffle__(mesh,group,extFaces):
     for sid in group.GetIDs():
         if not sid in extFaces:
+            __debugPrint__("group %s is a baffle\n" %group.GetName(),1)
             return True
     return False
         
