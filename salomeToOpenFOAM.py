@@ -155,9 +155,9 @@ def exportToFoam(mesh,dirname='polyMesh'):
                     bcFacesSorted[key]=ofbcfid
                     ofbcfid=ofbcfid+1
                 else:
-                    raise Exception("Error the face, elemId %d, %s belongs to two " + \
-                                        "or more groups. One is : %s" \
-                                        %(sfid,fnodes,gr.GetName()))
+                    raise Exception(\
+                        "Error the face, elemId %d, %s belongs to two " %(sfid,fnodes)  +\
+                            "or more groups. One is : %s"  %(gr.GetName()))
 
             #if the group is a baffle then the faces should be added twice
             if __isGroupBaffle__(mesh,gr,extFaces):
