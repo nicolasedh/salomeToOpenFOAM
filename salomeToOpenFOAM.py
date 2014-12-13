@@ -448,7 +448,7 @@ def __writeHeader__(file,fileType,nrPoints=0,nrCells=0,nrFaces=0,nrIntFaces=0):
     file.write("/*" + "-"*68 + "*\\\n" )
     file.write("|" + " "*70 + "|\n")
     file.write("|" + " "*4 + "File exported from Salome Platform" +\
-                   "using SalomeToFoamExporter" +" "*5 +"|\n")
+                   " using SalomeToFoamExporter" +" "*5 +"|\n")
     file.write("|" + " "*70 + "|\n")
     file.write("\*" + "-"*68 + "*/\n")
 
@@ -587,7 +587,7 @@ def __isGroupBaffle__(mesh,group,extFaces):
     return False
         
 
-if __name__ == "__main__":
+def main():
     """ 
     Main function. Export the selected mesh.
     
@@ -597,10 +597,11 @@ if __name__ == "__main__":
     for mesh in meshes:
         if not mesh == None:
             mName=mesh.GetName()
-            print "found selected mesh exporting to %s/%s/constant/polyMesh" \
-                %(os.getcwd(),mName)
             outdir=os.getcwd()+"/"+mName+"/constant/polyMesh"
-            exportToFoam(mesh,mesh.GetName())
-            print " "
+            __debugPrint__("found selected mesh exporting to " + outdir + ".\n",1)            
+            exportToFoam(mesh,outdir)
+            __debugPrint__("finished exporting",1)
             
     
+if __name__ == "__main__":
+    main()
