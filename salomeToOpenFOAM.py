@@ -564,7 +564,7 @@ def findSelectedMeshes():
         selected=salome.sg.getSelected(i)
         selobjID=salome.myStudy.FindObjectID(selected)
         selobj=selobjID.GetObject()
-        if selobj.__class__ ==SMESH._objref_SMESH_Mesh:
+        if selobj.__class__ == SMESH._objref_SMESH_Mesh or selobj.__class__ == salome.smesh.smeshBuilder.meshProxy :
             mName=selobjID.GetName().replace(" ","_")
             foundMesh=True
             mesh=smesh.Mesh(selobj)
@@ -600,7 +600,7 @@ def main():
             outdir=os.getcwd()+"/"+mName+"/constant/polyMesh"
             __debugPrint__("found selected mesh exporting to " + outdir + ".\n",1)            
             exportToFoam(mesh,outdir)
-            __debugPrint__("finished exporting",1)
+            __debugPrint__("finished exporting\n",1)
             
     
 if __name__ == "__main__":
