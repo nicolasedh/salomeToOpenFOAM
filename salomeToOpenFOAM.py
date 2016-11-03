@@ -575,7 +575,7 @@ def findSelectedMeshes():
         print "or run the export function directly from TUI"
         print " import SalomeToOpenFOAM"
         print " SalomeToOpenFOAM.exportToFoam(mesh,path)" 
-        return None
+        return list()
     else:
         return meshes
 
