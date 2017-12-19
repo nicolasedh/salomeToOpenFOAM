@@ -17,10 +17,12 @@ No sorting of faces is done so you'll have to run
 renumberMesh -overwrite
 In order to use the mesh.
 """
-#Copyright 2013
+#Copyright 2018
 #Author Nicolas Edh,
-#Nicolas.Edh@gmail.com,
-#or user "nsf" at cfd-online.com
+#Nicolas.Edh@gmail.com (user "nsf" at cfd-online.com)
+#Contributor(s):
+#   Sam Woodhead
+#   sam@blueforge.xyz
 #
 #License
 #
@@ -35,7 +37,7 @@ In order to use the mesh.
 #    GNU General Public License for more details.
 #
 #    You should have received a copy of the GNU General Public License
-#    along with hexBlocker.  If not, see <http://www.gnu.org/licenses/>.
+#    along with salomeToOpenFOAM.  If not, see <http://www.gnu.org/licenses/>.
 #
 #    The license is included in the file LICENSE.
 #
@@ -131,7 +133,7 @@ def exportToFoam(mesh,dirname='polyMesh'):
     __debugPrint__('Counting number of faces:\n')
     #Filter faces
     filter=smesh.GetFilter(SMESH.EDGE,SMESH.FT_FreeFaces)
-    extFaces=mesh.GetIdsFromFilter(filter)
+    extFaces=set(mesh.GetIdsFromFilter(filter))
     nrBCfaces=len(extFaces)
     nrExtFaces=len(extFaces)
     #nrBCfaces=mesh.NbFaces();#number of bcfaces in Salome
@@ -189,7 +191,7 @@ def exportToFoam(mesh,dirname='polyMesh'):
                             "or more groups. One is : %s"  %(gr.GetName()))
 
             #if the group is a baffle then the faces should be added twice
-            if __isGroupBaffle__(mesh,gr,extFaces):
+            if __isGroupBaffle__(mesh,gr,extFaces,grIds):
                 nrBCfaces+=nr
                 nrFaces+=nr
                 nrIntFaces-=nr
@@ -611,8 +613,8 @@ def findSelectedMeshes():
     else:
         return meshes
 
-def __isGroupBaffle__(mesh,group,extFaces):
-    for sid in group.GetIDs():
+def __isGroupBaffle__(mesh,group,extFaces,grIds):
+    for sid in grIds:
         if not sid in extFaces:
             __debugPrint__("group %s is a baffle\n" %group.GetName(),1)
             return True
